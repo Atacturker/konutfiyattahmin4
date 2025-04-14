@@ -34,18 +34,18 @@ df = preprocess_data(df)
         # Özellikleri one-hot encoded forma dönüştür
         input_data = {}
         for col in df.columns:
-            if col.startswith('İlçe'):
-                if col == f"İlçe_{selected_ilce}":
+            if col.startswith('ilce'):
+                if col == f"ilce_{selected_ilce}":
                     input_data[col] = 1
                 else:
                     input_data[col] = 0
-            elif col.startswith('Mahalle'):
-                if col == f"Mahalle_{selected_mahalle}":
+            elif col.startswith('mahalle'):
+                if col == f"mahalle_{selected_mahalle}":
                     input_data[col] = 1
                 else:
                     input_data[col] = 0
-            elif col.startswith('OdaSayısı'):
-                if col == f"OdaSayısı_{selected_oda}":
+            elif col.startswith('odasayi'):
+                if col == f"odasayi_{selected_oda}":
                     input_data[col] = 1
                 else:
                     input_data[col] = 0
