@@ -7,7 +7,11 @@ def main():
 
     # Veri yükleme
     df = load_data('HouseData2.xlsx')
-    df = preprocess_data(df)
+if df is None:
+    st.error("Veri yüklenirken bir hata oluştu. Lütfen dosya yolunu ve dosya içeriğini kontrol edin.")
+    st.stop()
+df = preprocess_data(df)
+
 
     # Model eğitimi
     models, scores = train_models(df)
