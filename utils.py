@@ -11,16 +11,16 @@ def load_data(file_path):
 
 def preprocess_data(df):
     # Aykırı değerlerin filtrelenmesi
-    lower_bound = df['Fiyat'].quantile(0.05)
-    upper_bound = df['Fiyat'].quantile(0.95)
-    df = df[(df['Fiyat'] >= lower_bound) & (df['Fiyat'] <= upper_bound)]
+    lower_bound = df['fiyat'].quantile(0.05)
+    upper_bound = df['fiyat'].quantile(0.95)
+    df = df[(df['fiyat'] >= lower_bound) & (df['fiyat'] <= upper_bound)]
 
     # Balkon bilgisi varsa, eksik değerleri kaldır
     if 'Balkon' in df.columns:
-        df = df.dropna(subset=['Balkon'])
+        df = df.dropna(subset=['balkon'])
 
     # Kategorik sütunları one-hot encoding ile dönüştür
-    categorical_cols = ['İlçe', 'Mahalle', 'OdaSayısı']
+    categorical_cols = ['ilce', 'mahalle', 'odasayi']
     for col in categorical_cols:
         if col in df.columns:
             dummies = pd.get_dummies(df[col], prefix=col)
