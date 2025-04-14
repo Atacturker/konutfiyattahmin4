@@ -6,7 +6,7 @@ def main():
     st.title("Konut Fiyat Tahmin Uygulaması")
 
     # Veri yükleme
-    df = load_data('data/HouseData2.xlsx')
+    df = load_data('HouseData2.xlsx')
     df = preprocess_data(df)
 
     # Model eğitimi
