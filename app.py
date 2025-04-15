@@ -13,13 +13,14 @@ def main():
         st.error("Veri yüklenirken bir hata oluştu. Lütfen dosya yolunu ve dosya içeriğini kontrol edin.")
         st.stop()
 
-    # Kullanıcının girdi seçenekleri için, ham veriden benzersiz değerler alınır.
+    # Kategorik sütunlar ve seçeneklerin alınması: tip gibi sütunların tümünü string'e çevirebiliriz
     categorical_fields = ['ilce', 'mahalle', 'tip', 'esya', 'odasayi', 'isitma', 'site', 'balkon']
     options = {}
     for col in categorical_fields:
         if col in raw_df.columns:
-            options[col] = sorted(raw_df[col].dropna().unique())
-    
+            # Tüm değerler string'e çevriliyor ve sıralı hale getiriliyor
+            options[col] = sorted(raw_df[col].dropna().unique(), key=lambda x: str(x))
+
     # Sayısal alanlar için min, max değerleri hesaplayın (Varsayım: metrekare, binayas, binakat, banyosayi, dairekat, balkonsayi)
     numeric_fields = ['metrekare', 'binayas', 'binakat', 'banyosayi', 'dairekat', 'balkonsayi']
     num_min = {}
