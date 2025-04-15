@@ -8,8 +8,8 @@ import numpy as np
 
 def train_models(df):
     """
-    df: ön işlemden geçmiş DataFrame (one-hot encoding uygulanmış) ve hedef sütun 'fiyat' içermeli.
-    Eğitim seti oluşturulup üç model eğitilmekte, her modelin skorları hesaplanmakta.
+    df: Ön işlemden geçmiş DataFrame (one-hot encoding uygulanmış) ve hedef sütun 'fiyat' içermeli.
+    Üç model eğitilmekte ve her birinin R² skorları hesaplanmakta.
     """
     X = df.drop('fiyat', axis=1)
     y = df['fiyat']
@@ -33,7 +33,7 @@ def train_models(df):
         'kernel': ['linear', 'rbf'],
         'C': [0.1, 1, 10],
     }
-    grid_svr = GridSearchCV(svr, param_grid_svr, cv=5, scoring='r2')
+    grid_svr = GridSearchCV(svr, param_grid_svr, cv=5, scoring='r2', error_score='raise')
     grid_svr.fit(X_train, y_train)
     best_svr = grid_svr.best_estimator_
     y_pred_svr = best_svr.predict(X_test)
