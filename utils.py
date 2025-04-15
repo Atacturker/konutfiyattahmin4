@@ -19,30 +19,41 @@ def preprocess_data(df):
     - Kolon adlarını küçük harfe çekme,
     - 'fiyat' sütunundan "TL" ve virgülleri kaldırıp numeric hale getirme,
     - Uç değer filtrelemesi,
-    - Balkon sütunu varsa eksik değerleri kaldırma,
-    - Belirlenen kategorik sütunları one-hot encoding’e çevirme.
+    - Sayısal sütunlardaki (metrekare, binayas, binakat, banyosayi, dairekat, balkonsayi) eksik değerler medyanla doldurulması,
+    - Kategorik sütunlardaki eksik verilerin "Bilinmiyor" ile doldurulması,
+    - One-hot encoding uygulanması.
     """
     # Kolon adlarını küçük harfe çekelim
     df.columns = [col.strip().lower() for col in df.columns]
 
     # 'fiyat' sütununu temizle (örneğin: "300,000TL" -> 300000)
-    df['fiyat'] = df['fiyat'].astype(str)\
-                        .str.replace('TL', '', regex=False)\
-                        .str.replace(',', '', regex=False)\
-                        .str.strip()\
-                        .astype(float)
+    df['fiyat'] = (df['fiyat']
+                   .astype(str)
+                   .str.replace('TL', '', regex=False)
+                   .str.replace(',', '', regex=False)
+                   .str.strip()
+                   .astype(float))
 
     # Uç değerleri filtrele (fiyat sütununa göre)
     lower_bound = df['fiyat'].quantile(0.05)
     upper_bound = df['fiyat'].quantile(0.95)
     df = df[(df['fiyat'] >= lower_bound) & (df['fiyat'] <= upper_bound)]
 
-    # Balkon bilgisi varsa; boş olanları kaldırıyoruz
-    if 'balkon' in df.columns:
-        df = df.dropna(subset=['balkon'])
+    # Sayısal sütunlar: medyan ile dolduralım
+    numeric_columns = ['metrekare', 'binayas', 'binakat', 'banyosayi', 'dairekat', 'balkonsayi']
+    for col in numeric_columns:
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors='coerce')
+            median_val = df[col].median()
+            df[col] = df[col].fillna(median_val)
 
-    # Kategorik sütunlar (gereksinime göre güncelleyebilirsiniz)
+    # Kategorik sütunlar: eksik değerleri "Bilinmiyor" ile dolduralım
     categorical_cols = ['ilce', 'mahalle', 'tip', 'esya', 'odasayi', 'isitma', 'site', 'balkon']
+    for col in categorical_cols:
+        if col in df.columns:
+            df[col] = df[col].fillna('Bilinmiyor')
+
+    # Kategorik sütunları one-hot encoding ile dönüştürelim
     for col in categorical_cols:
         if col in df.columns:
             dummies = pd.get_dummies(df[col], prefix=col)
@@ -56,25 +67,20 @@ def preprocess_data(df):
 
 def transform_new_data(input_df, model_columns):
     """
-    Kullanıcıdan gelen ham veri (pandas DataFrame formatında) için aynı one-hot encoding dönüşümünü uygular.
-    Mevcut sütunlara göre yeniden indeksleyerek eksik kolonları 0 olarak doldurur.
-    Not: Bu fonksiyon, eğitimde hangi kolonların kullanıldığını bilen model_columns parametresi ile çalışır.
+    Kullanıcıdan gelen ham veri için aynı one-hot encoding dönüşümünü uygular.
+    Eğitimde kullanılan sütunlara göre yeniden indeksleyip eksik değerleri 0 ile doldurur.
     """
-    # Ham veride, one-hot dönüşümü uygulanması gereken kategorik sütunlar
-    # (Eğitim öncesinde kullanılan kategorik kolonların adlarını burada belirtmeliyiz)
+    # Kategorik sütunlar, eğitimde kullanılanları burada da aynı şekilde one-hot işlemi yapılmalıdır.
     categorical_cols = ['ilce', 'mahalle', 'tip', 'esya', 'odasayi', 'isitma', 'site', 'balkon']
-    
-    # Sayısal kolonlar varsayım olarak doğrudan alınıyor: 
-    # metrekare, binayas, binakat, banyosayi, dairekat, balkonsayi
     df_processed = input_df.copy()
     
-    # Uygun sütunlarda one-hot encoding yap
     for col in categorical_cols:
         if col in df_processed.columns:
+            df_processed[col] = df_processed[col].fillna('Bilinmiyor')
             dummies = pd.get_dummies(df_processed[col], prefix=col)
             df_processed = pd.concat([df_processed.drop(col, axis=1), dummies], axis=1)
     
-    # Eğitimde kullanılan sütunlarla aynı düzeni yakalamak için reindex
+    # Eğitimde kullanılan sütunlarla aynı düzeni yakalayalım
     df_processed = df_processed.reindex(columns=model_columns, fill_value=0)
     
     return df_processed
