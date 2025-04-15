@@ -1,24 +1,27 @@
-# app.py
 import streamlit as st
 import pandas as pd
 import joblib
-from utils import load_data, preprocess_data, transform_new_data
+import os
+from utils import load_data, transform_new_data
 
 def main():
     st.title("Konut Fiyat Tahmin Uygulaması")
-
-    # Ham veriyi yükle
+    
+    # Ham veriyi yükleyelim (veri kaynağı; burada seçenekleri filtrelemek için kullanacağız)
     raw_df = load_data('HouseData2.xlsx')
     if raw_df is None:
         st.error("Veri yüklenirken bir hata oluştu. Lütfen dosya yolunu ve dosya içeriğini kontrol edin.")
         st.stop()
 
-    # İlçe ve mahalle eşlemesi
+    # İlçe ve mahalle eşlemesi (ham veriden)
     if ('ilce' in raw_df.columns) and ('mahalle' in raw_df.columns):
         raw_df['ilce'] = raw_df['ilce'].fillna("Bilinmiyor")
         raw_df['mahalle'] = raw_df['mahalle'].fillna("Bilinmiyor")
         ilce_list = sorted(raw_df['ilce'].unique(), key=lambda x: str(x))
-        ilce_mahalle_map = {ilce: sorted(raw_df.loc[raw_df['ilce'] == ilce, 'mahalle'].unique(), key=lambda x: str(x)) for ilce in ilce_list}
+        ilce_mahalle_map = {
+            ilce: sorted(raw_df.loc[raw_df['ilce'] == ilce, 'mahalle'].unique(), key=lambda x: str(x))
+            for ilce in ilce_list
+        }
     else:
         ilce_list = []
         ilce_mahalle_map = {}
@@ -33,17 +36,43 @@ def main():
     else:
         selected_mahalle = "Bilinmiyor"
 
-    # Diğer seçimler
-    selected_tip = st.sidebar.selectbox("Bina Tipi Seçiniz", sorted(raw_df['tip'].dropna().unique(), key=lambda x: str(x)) if 'tip' in raw_df.columns else [])
-    selected_isitma = st.sidebar.selectbox("Isıtma Türü Seçiniz", sorted(raw_df['isitma'].dropna().unique(), key=lambda x: str(x)) if 'isitma' in raw_df.columns else [])
-    selected_odasayi = st.sidebar.selectbox("Oda Sayısı Seçiniz", sorted(raw_df['odasayi'].dropna().unique(), key=lambda x: str(x)) if 'odasayi' in raw_df.columns else [])
-    selected_esya = st.sidebar.selectbox("Eşya Durumu Seçiniz", sorted(raw_df['esya'].dropna().unique(), key=lambda x: str(x)) if 'esya' in raw_df.columns else [])
+    # Diğer seçim kutuları
+    selected_tip = st.sidebar.selectbox(
+        "Bina Tipi Seçiniz", 
+        sorted(raw_df['tip'].dropna().unique(), key=lambda x: str(x)) if 'tip' in raw_df.columns else []
+    )
+    selected_isitma = st.sidebar.selectbox(
+        "Isıtma Türü Seçiniz", 
+        sorted(raw_df['isitma'].dropna().unique(), key=lambda x: str(x)) if 'isitma' in raw_df.columns else []
+    )
+    selected_odasayi = st.sidebar.selectbox(
+        "Oda Sayısı Seçiniz", 
+        sorted(raw_df['odasayi'].dropna().unique(), key=lambda x: str(x)) if 'odasayi' in raw_df.columns else []
+    )
+    selected_esya = st.sidebar.selectbox(
+        "Eşya Durumu Seçiniz", 
+        sorted(raw_df['esya'].dropna().unique(), key=lambda x: str(x)) if 'esya' in raw_df.columns else []
+    )
 
-    # Balkon durumu
-    selected_balkon = st.sidebar.selectbox("Balkon Durumu Seçiniz", sorted(raw_df['balkon'].dropna().unique(), key=lambda x: str(x)) if 'balkon' in raw_df.columns else [])
+    # Balkon durumu ve ona göre balkon sayısı
+    selected_balkon = st.sidebar.selectbox(
+        "Balkon Durumu Seçiniz", 
+        sorted(raw_df['balkon'].dropna().unique(), key=lambda x: str(x)) if 'balkon' in raw_df.columns else []
+    )
+    if selected_balkon.lower() == "var":
+        # Buradaki max değeri verinizdeki 'balkonsayi' sütununa göre alıyoruz; yoksa varsayılan değerler kullanılabilir.
+        try:
+            raw_df['balkonsayi'] = pd.to_numeric(raw_df['balkonsayi'], errors='coerce')
+            min_balkon = int(raw_df['balkonsayi'].min())
+            max_balkon = int(raw_df['balkonsayi'].max())
+        except Exception:
+            min_balkon, max_balkon = 0, 10
+        selected_balkonsayi = st.sidebar.number_input("Balkon Sayısı Giriniz", min_value=min_balkon, max_value=max_balkon, value=1, step=1)
+    else:
+        selected_balkonsayi = 0
 
-    # Sayısal alanlar için değer hesaplamaları (integer)
-    numeric_fields = ['metrekare', 'binayas', 'binakat', 'banyosayi', 'dairekat', 'balkonsayi']
+    # Sayısal alanlar için değerler (integer şeklinde)
+    numeric_fields = ['metrekare', 'binayas', 'binakat', 'banyosayi', 'dairekat']
     num_values = {}
     for col in numeric_fields:
         if col in raw_df.columns:
@@ -57,27 +86,26 @@ def main():
     selected_binayas = st.sidebar.number_input("Bina Yaşı Giriniz", min_value=num_values['binayas'][0], max_value=num_values['binayas'][1], value=num_values['binayas'][2], step=1)
     selected_binakat = st.sidebar.number_input("Bina Katı Giriniz", min_value=num_values['binakat'][0], max_value=num_values['binakat'][1], value=num_values['binakat'][2], step=1)
     selected_dairekat = st.sidebar.number_input("Daire Katı Giriniz", min_value=num_values['dairekat'][0], max_value=num_values['dairekat'][1], value=num_values['dairekat'][2], step=1)
-    
-    # Eğer balkon durumu "Var" ise balkon sayısını sor, aksi halde 0 al
-    if selected_balkon.lower() == "var":
-        selected_balkonsayi = st.sidebar.number_input("Balkon Sayısı Giriniz", min_value=num_values['balkonsayi'][0], max_value=num_values['balkonsayi'][1], value=1, step=1)
-    else:
-        selected_balkonsayi = 0
 
-    # Model seçimi (önceden eğitilmiş model dosyasından yükleme)
+    # Model seçimi: "Karar Ağacı", "SVR", "Yapay Sinir Ağı" gibi seçenekler
     model_option = st.sidebar.selectbox("Model Seçiniz", ["Karar Ağacı", "SVR", "Yapay Sinir Ağı"])
 
-    # ÖNCE, daha önceden eğitilmiş modeli yükleyelim:
-    try:
-        saved_model = joblib.load('trained_models.pkl')
-        models = saved_model["models"]
-        scores = saved_model["scores"]
-        model_columns = saved_model["model_columns"]
-    except Exception as e:
-        st.error(f"Önceden eğitilmiş model yüklenemedi: {e}")
-        st.stop()
+    # ÖNCE, önceden eğitilmiş modeli yükleyelim.
+    with st.spinner("Önceden eğitilmiş model yükleniyor..."):
+        model_file = 'trained_models.pkl'
+        if not os.path.exists(model_file):
+            st.error(f"{model_file} bulunamadı. Lütfen modeli train_and_save.py ile eğitip dosyayı repository'ye ekleyin.")
+            st.stop()
+        try:
+            saved_model = joblib.load(model_file)
+            models = saved_model["models"]
+            scores = saved_model["scores"]
+            model_columns = saved_model["model_columns"]
+        except Exception as e:
+            st.error(f"Önceden eğitilmiş model yüklenemedi: {e}")
+            st.stop()
 
-    # Kullanıcı giriş verisi hazırlama
+    # Kullanıcı giriş verisini hazırlayalım.
     input_data = {
         "ilce": [selected_ilce],
         "mahalle": [selected_mahalle],
@@ -95,15 +123,15 @@ def main():
     }
     input_df = pd.DataFrame(input_data)
 
-    # Kullanıcı giriş verisini modelin eğitiminde kullanılan sütunlara uygun hale getiriyoruz.
+    # Kullanıcının girdi verisini, eğitimde kullanılan sütunlarla uyumlu hale getirelim.
     input_transformed = transform_new_data(input_df, model_columns)
 
-    # Fiyat tahmini al butonuna basılınca
+    # Fiyat tahmini almak için buton
     if st.button("Fiyat Tahmini Al"):
         model = models[model_option]
         prediction = model.predict(input_transformed)[0]
-        st.write(f"Seçilen ({model_option}) modele göre tahmini konut fiyatı: {prediction:,.2f} TL")
-        st.write("Model başarı oranı (R² skoru):", round(scores[model_option], 2))
+        st.success(f"Seçilen ({model_option}) modele göre tahmini konut fiyatı: {prediction:,.2f} TL")
+        st.info(f"Model başarı oranı (R² skoru): {round(scores[model_option], 2)}")
 
 if __name__ == '__main__':
     main()
